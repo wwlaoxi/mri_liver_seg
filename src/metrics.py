@@ -1,7 +1,8 @@
 #!/usr/bin/env python
-from numpy import np
+import numpy as np
 
-
+# for postprocessing
+from scipy.ndimage import label, binary_erosion, binary_dilation 
 #%%  metrics to evaluate the segmentation volumes, need to also implement surface metrics 
 def dice_coef_py(y_true, y_pred):
 
@@ -35,3 +36,28 @@ def rel_vol_diff(y_true,y_pred):
 
 
 #%%
+def convert_binary(img_vol):
+    binary_vol = np.zeros(img_vol.shape)
+    binary_vol[img_vol>=0.5] = 1.0
+    binary_vol[img_vol<0.5] = 0.0
+    return binary_vol
+    
+    
+#%%
+def postprocess_cnn(cnn_seg):
+    
+    nobj = 3
+    struct1 = np.ones((nobj,nobj,nobj))
+    pred_postp1 = binary_erosion(cnn_seg,structure=struct1)
+    struct2 = np.ones((3,3,3))
+    labels, num_features = label(pred_postp1,struct2)
+    feature_size = np.zeros((num_features,))   
+    for ii in range(num_features):
+        feature_size[ii] = np.sum(labels==(ii+1))
+    
+    label_liver = np.argmax(feature_size)
+    pred_postp = np.zeros(cnn_seg.shape)
+    pred_postp[labels== (label_liver+1)] = 1
+    pred_postp = binary_dilation(pred_postp,struct1)
+
+    return pred_postp

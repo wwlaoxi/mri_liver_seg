@@ -126,3 +126,31 @@ def copy_image_series(src, dest):
             print('Directory not copied.  Error:%s'%e)
 
 
+
+            
+#%% helper functio that transform the image volume from ITK-SNAP friendly view
+# to the view makes sense in python training
+def transform_ITKSNAP_to_training(imgvol):
+    tmp = np.flip(np.flip(np.flip(imgvol,axis=0),axis=1),axis=2)
+    imgvol2 = np.transpose(tmp,[1,0,2])
+    return imgvol2
+    
+
+
+def preprocess_segvol(imgvol,image_output_size):
+    """ 
+    perform data volume preprocessing 
+    imgvol: input image volume
+    image_output_size: tupe of output size
+    
+    """
+    tmp   =  imgvol.astype(IMG_DTYPE)
+    # determin zoom factor
+    zoom_x = image_output_size[0]/imgvol.shape[0]
+    zoom_y = image_output_size[1]/imgvol.shape[1]
+    zoom_z = image_output_size[2]/imgvol.shape[2]
+    tmp =   zoom(tmp,[zoom_x,zoom_y,zoom_z],order=0)     
+    # convert back to binary since interpolation might have some values that are not 0 or 1
+    tmp[tmp<0.5] = 0.0
+    tmp[tmp>=0.5] = 1.0
+    return tmp    

@@ -90,6 +90,6 @@ for ii in range(num_cases):
     
     #copy_image_series(lipoquant_dn, output_path)
     
-    
-    
 #%%
+output_dn='D:/liverseg_training/mri_liverseg_LAGB_testcases/' 
+tmplist = os.listdir(output_dn)

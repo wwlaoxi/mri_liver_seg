@@ -38,7 +38,6 @@ from keras.preprocessing.image import ImageDataGenerator
 # custom function 
 from src.dilatedCNN import dilatedCNN, dice_coef_loss, dice_coef, jacc_dist
 from src.dilatedresidualCNN import ResnetBuilder
-from src.unet import UNet
 from src.utility import listdir_fullpath, imshow
 from src.train import get_subset, hist_match,batch_read, batch_read_multiecho, batch_read_2echo
 
@@ -53,8 +52,7 @@ list_seg = listdir_fullpath(seg_dir)
 
 # only grab the out-of-phase echoes
 echo_list = [0]
-# using 74 for training, 10 for validation
-img_list_train = [ii for ii in range(143)]
+img_list_train = [ii for ii in range(143)] + [ii for ii in range(174,241)]
 img_list_test = [ii for ii in range(143,173)] 
 train_img_list,train_seg_list = get_subset(img_dir,seg_dir,echo_list,img_list_train)
 test_img_list, test_seg_list = get_subset(img_dir,seg_dir,echo_list,img_list_test)
@@ -83,7 +81,7 @@ images,masks, tmp = batch_read(train_list,10,0)
 images,masks, tmp = batch_read_multiecho(train_list,10,0,[0,1,2,3,4,5])
 # Provide the same seed and keyword arguments to the fit and flow methods
 #%%
-
+seed = 1
 image_datagen.fit(images, augment=True, seed=seed)
 mask_datagen.fit(masks, augment=True, seed=seed)
 #%%
@@ -168,7 +166,7 @@ for x_test, y_test in train_generator:
 
 
 #%% initialize the model and training parameters
-batch_size = 4
+batch_size = 32
 n_train = len(train_img_list)
 n_test = len(test_img_list)
 print("using "+ str(n_train)+" for training and using "+ str(n_test)+" for testing")
@@ -205,7 +203,7 @@ model.compile(optimizer=Adam(lr=1e-5), loss=jacc_dist, metrics=[dice_coef])
 
 
 #%% start training
-num_epochs=50
+num_epochs=30
 n_per_epoch = np.round(n_train/batch_size)
 n_test_steps = np.round(n_test/batch_size)
 hist1 = model.fit_generator(train_generator,steps_per_epoch=n_per_epoch,epochs=num_epochs,
@@ -214,7 +212,7 @@ hist1 = model.fit_generator(train_generator,steps_per_epoch=n_per_epoch,epochs=n
                                verbose=1)
 
 #%%
-model_fn ='liverseg_mri6E_nodropout_drsn_augment_histeq_11212017'
+model_fn ='liverseg_mri6E_nodropout_drsn_augment_histeq_12102017'
 model.save(model_fn)
 
 #%% save the hist object that store the optimization
