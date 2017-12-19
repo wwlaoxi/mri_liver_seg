@@ -3,6 +3,8 @@ import numpy as np
 
 # for postprocessing
 from scipy.ndimage import label, binary_erosion, binary_dilation 
+from sklearn import mixture
+
 #%%  metrics to evaluate the segmentation volumes, need to also implement surface metrics 
 def dice_coef_py(y_true, y_pred):
 
@@ -61,3 +63,43 @@ def postprocess_cnn(cnn_seg):
     pred_postp = binary_dilation(pred_postp,struct1)
 
     return pred_postp
+    
+#%% estimate the whole-liver mean PDFF values assuming there are separate populations of PDFF values: 1) liver parenchyma, 2) vessels 
+# can extend to other classes if needed   
+def estimate_mean_from_gmm(pdff_values):
+    """
+    we are assuming the possibility of two group of values, 1 represent PDFF and another represent the blood vessels
+    
+    """
+    pdff_values = pdff_values.reshape(-1,1)
+    # use BIC criteria to choose 1 vs. 2 component GMM
+    bic = []
+    lowest_bic = np.infty
+    n_components_range = 3
+    for n_components in n_components_range:
+        gmm = mixture.GaussianMixture(n_components=n_components)
+        gmm.fit(pdff_values)
+        bic.append(gmm.bic(pdff_values))
+        if bic[-1] < lowest_bic:
+            lowest_bic = bic[-1]
+            best_gmm = gmm
+    labels = best_gmm.predict(pdff_values)
+    group_size = np.zeros((2,))
+    group_size[0] = np.sum(labels==0)
+    group_size[1] = np.sum(labels==1)
+    #group_size[2] = np.sum(labels==2)
+    return gmm.means_[np.argmax(group_size)]                               
+                               
+                               
+                               
+                               
+                               
+                               
+                               
+                               
+                               
+                               
+                               
+                               
+                               
+                               

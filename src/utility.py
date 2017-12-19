@@ -136,7 +136,6 @@ def transform_ITKSNAP_to_training(imgvol):
     return imgvol2
     
 
-
 def preprocess_segvol(imgvol,image_output_size):
     """ 
     perform data volume preprocessing 
@@ -154,3 +153,18 @@ def preprocess_segvol(imgvol,image_output_size):
     tmp[tmp<0.5] = 0.0
     tmp[tmp>=0.5] = 1.0
     return tmp    
+
+    
+#%%
+def get_FFmap_fn(data_dn):
+    pat = re.compile('LQ.*_[0-9]*')
+    matchObj = pat.search(data_dn)
+    tmp = matchObj.group(0)
+    # split it by '_' and get the last element which is seriesID
+    tmp2 = re.split('_',tmp)
+    len_char = len(tmp2[-1])
+    seriesID = 9000 + np.int(tmp2[-1])
+    FFmap_pat = 'FF' + tmp[:-1*len_char] + str(seriesID)
+    FFmap_fn = re.sub('LQ.*_[0-9]*',FFmap_pat,data_dn)    
+    return FFmap_fn
+
