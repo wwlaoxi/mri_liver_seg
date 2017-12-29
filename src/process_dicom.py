@@ -70,7 +70,7 @@ def process_dicom(path, target_x_size=256, target_y_size=256, target_z_size = 25
     """
     """
     # initialize rslt_dict
-    rslt_dict = {}
+    result_dict = {}
     # store files and append path
     dicom_files = glob.glob(os.path.join(path, "*.dcm"))
 
@@ -81,14 +81,37 @@ def process_dicom(path, target_x_size=256, target_y_size=256, target_z_size = 25
     dicom_lst = sort_dicom_list(dicom_lst)
 
     # return image sizes to result dict
-    rslt_dict["slices"] = dicom_lst[-1].InstanceNumber
-    rslt_dict["Rows"] = dicom_lst[0].Rows
-    rslt_dict["Columns"] = dicom_lst[0].Columns
+    Nx = dicom_lst[0].Rows
+    Ny = dicom_lst[0].Columns
     
     # alot of time we only want resampling along axial direction for 2D processing
-    Nz = np.int( dicom_lst[-1].InstanceNumber - dicom_lst[0].InstanceNumber+1)
+    #Nz = np.int( dicom_lst[-1].InstanceNumber - dicom_lst[0].InstanceNumber+1)
+    Nz = len(dicom_lst)
     if target_z_size == 0:
-        target_z_size = Nz     
+        target_z_size = Nz
+    # also give the option using original image matrix 
+    if target_x_size ==0:
+        target_x_size = Nx
+    
+    if target_y_size ==0:
+        target_y_size = Ny
+    
+    # the following data might not be available due to anonymization
+    try:
+        result_dict['patientID'] = dicom_lst[0].PatientID
+        result_dict['AcquisitionDate'] = dicom_lst[0].AcquisitionDate
+    except:
+        pass    
+    
+    # get the resolution of the matrix
+    scale_x = target_x_size/Nx
+    scale_y = target_y_size/Ny
+    scale_z = target_z_size/Nz
+    result_dict['image_scale'] = (scale_x,scale_y,scale_z)
+    x_sampling = np.float( dicom_lst[0].PixelSpacing[0] )
+    y_sampling = np.float( dicom_lst[0].PixelSpacing[1] )
+    z_sampling = np.float( dicom_lst[0].SliceThickness )
+    result_dict['image_resolution'] = (x_sampling*scale_x,y_sampling*scale_y,z_sampling*scale_z)   
 
     # make a list and cast as 3D matrix
     pxl_lst = [x.pixel_array for x in dicom_lst]
@@ -98,9 +121,9 @@ def process_dicom(path, target_x_size=256, target_y_size=256, target_z_size = 25
     pxl_lst = [imresize(x.astype('float32'), (target_y_size, target_x_size),mode='F') for x in pxl_lst]
 
     pxl_mtx = pxl_lst
-    pxl_mtx = linear_interpolate(pxl_lst, target_z_size)
-
-    return pxl_mtx
+    pxl_mtx = linear_interpolate(pxl_lst, target_z_size) 
+    result_dict['image_data'] = pxl_mtx
+    return result_dict
                      
 #%% the following are modified routines to handle multi-echoes MRI series that 
 def sort_dicom_list_multiEchoes(dicom_list):
@@ -113,7 +136,7 @@ def sort_dicom_list_multiEchoes(dicom_list):
         raise AssertionError("Not all elements are dicom images")
     
     #s_dicom_lst = sorted(dicom_list,key=attrgetter('InstanceNumber'))
-    # sort according to SliceLocation from hight to low so we always go from S->I, instance number doesn't have location information
+    # sort according to SliceLocation from high to low so we always go from S->I, instance number doesn't have location information
     s_dicom_lst = sorted(dicom_list,key=attrgetter('InstanceNumber'))
     ss_dicom_lst = sorted(s_dicom_lst,key=attrgetter('EchoNumbers'))
     num_echoes = ss_dicom_lst[-1].EchoNumbers
@@ -165,7 +188,13 @@ def process_dicom_multiEcho(path, target_x_size=256, target_y_size=256, target_z
     # make a list and cast as 3D matrix for each echo 
     # give the option that don't interpolate along the z-axis if 2-D processing
     if target_z_size == 0:
-        target_z_size = Nz    
+        target_z_size = Nz
+    # also give the option using original image matrix 
+    if target_x_size ==0:
+        target_x_size = Nx
+    
+    if target_y_size ==0:
+        target_y_size = Ny
     
     scale_x = target_x_size/Nx
     scale_y = target_y_size/Ny

@@ -168,3 +168,8 @@ def get_FFmap_fn(data_dn):
     FFmap_fn = re.sub('LQ.*_[0-9]*',FFmap_pat,data_dn)    
     return FFmap_fn
 
+
+    
+
+    
+    

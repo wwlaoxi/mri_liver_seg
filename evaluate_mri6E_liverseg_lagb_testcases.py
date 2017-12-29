@@ -29,16 +29,13 @@ from src.process_dicom import process_dicom, process_dicom_multiEcho
 #from scipy.ndimage import label, binary_erosion, binary_dilation 
 
 #%% load the model based on all echoes data 
-model_fn = 'C:/Users/kang927/Documents/deep_learning_liverseg/mri_liver_seg/liverseg_mri6E_nodropout_drsn_augment_histeq_11212017'
+model_fn = 'C:/Users/kang927/Documents/deep_learning_liverseg/mri_liver_seg/liverseg_mri6E_nodropout_drsn_augment_histeq_12102017'
 model = load_model(model_fn, custom_objects={'jacc_dist': jacc_dist, 
                                             'dice_coef': dice_coef})
 
 
-#%%
-
     
 #%%
-
 segmentations_dn = 'D:/liverseg_training/mri_liverseg_LAGB_testcases/segmentations/'
 img_lst = 'D:/liverseg_training/mri_liverseg_LAGB_testcases/data/'
 data_list = listdir_fullpath(segmentations_dn)
@@ -50,8 +47,8 @@ voe = np.zeros((Nvol,))
 rvd = np.zeros((Nvol,))
 liverVol_seg = np.zeros((Nvol,))
 liverVol_pred = np.zeros((Nvol,))
-meanPDFF_pred = np.zeros((Nvol,))
-
+meanPDFF_gmm = np.zeros((Nvol,))
+meanPDFF_avg = np.zeros((Nvol,))
 #%%
 for ii in range(0,Nvol):
     manual_seg_fn = glob.glob(os.path.join(data_list[ii], "*nii.gz"))[0]
@@ -65,6 +62,7 @@ for ii in range(0,Nvol):
     mri_6echo_path = img_lst + data_dn
     result = process_dicom_multiEcho(mri_6echo_path, target_x_size=224, target_y_size=224,target_z_size=0)
     img_data = np.transpose(result['image_data'][:,:,:,:],[2,0,1,3])
+    #img_data1 = img_data[:,:,:,2:3]
     pred = model.predict(img_data,batch_size=8)
     # postprocessing 
     # swap the z-axis to the last dimension
@@ -93,7 +91,8 @@ for ii in range(0,Nvol):
     ffmap_path = img_lst + ffmap_fn
     ffmap = process_dicom(ffmap_path,target_x_size=224, target_y_size=224,target_z_size=0)
     ff_liver = ffmap[tmp2==1]
-    meanPDFF_pred[ii] = estimate_mean_from_gmm(ff_liver)
+    meanPDFF_gmm[ii] = estimate_mean_from_gmm(ff_liver)
+    meanPDFF_avg[ii] = np.mean(ff_liver)
     
 #%% print summary
 print(" mean voe = " + str(np.mean(voe)))
@@ -152,100 +151,99 @@ plt.scatter(mean_vol, diff_vol)
 plt.axhline(md,           color='red', linestyle='--')
 plt.axhline(md + 1.96*sd, color='blue', linestyle='--')
 plt.axhline(md - 1.96*sd, color='blue', linestyle='--')
-plt.xlabel('mean Liver Volume (cm^3)')
-plt.ylabel('Percent Difference in liver volume (%) ')
-plt.title('Bland-Altman Plot of Liver Volume Measurements')
+plt.xlabel('averaged liver volume (cm^3)')
+plt.ylabel('% difference in liver volume (manual-automated) ')
+plt.title('Bland-Altman Plot of liver volume measurements')
 
 
-#%%
+#%%  mean PDFF measurements 
 # compare to manual analysis data
-pdff_8avg = np.array([2.70,
-2.09,
-9.08,
-3.39,
-2.81,
-10.93,
-5.49,
-17.44,
-8.39,
-1.69,
-6.16,
-4.58,
-10.23,
-24.61,
-5.10,
-4.92,
-3.01,
-3.19,
-2.50,
-23.31,
-3.23,
-24.60,
-25.55,
-4.52,
-2.66,
-1.51,
-32.09,
-3.61,
-6.57,
-1.99,
-5.90,
-3.04,
-20.70,
-10.58,
-19.93,
-24.43,
-6.89,
-16.53,
-12.36,
-3.00])
+pdff_8avg = np.array([2.70,2.09,9.08,3.39,2.81,10.93,5.49,17.44,8.39,1.69,6.16,4.58,10.23,24.61,5.10,4.92,3.01,3.19,2.50,23.31,3.23,24.60,25.55,4.52,2.66,
+1.51,32.09,3.61,6.57,1.99,5.90,3.04,20.70,10.58,19.93,24.43,6.89,16.53,12.36,3.00])
 
-pdff_wholeliver_pred =np.array([2.964057513,
-1.987908925,
-9.259303342,
-3.178082531,
-2.630371365,
-10.80626323,
-6.197996258,
-17.97435003,
-8.528459884,
-2.051574669,
-6.131656788,
-3.632764559,
-10.70973987,
-24.26688688,
-2.768575637,
-4.760218118,
-2.833846485,
-3.536821456,
-2.639656107,
-23.51695483,
-3.485845643,
-25.58124785,
-24.78953581,
-4.817887772,
-2.54919875,
-1.452538097,
-31.30676412,
-3.20096904,
-6.116638772,
-2.06190294,
-5.200105561,
-2.709154986,
-19.95650007,
-10.02830354,
-20.19746119,
-24.53125732,
-7.198177534,
-15.78859361,
-11.96562626,
-3.240205375])
+tmp = np.delete(meanPDFF_gmm,17)
+pdff_wholeliver_gmm = tmp[:-9]
+# old data PDFF is in thousands to PDFF %
+pdff_wholeliver_gmm[0]=pdff_wholeliver_gmm[0]/10
+pdff_wholeliver_gmm[1]=pdff_wholeliver_gmm[1]/10
+
+# just simple average
+tmp = np.delete(meanPDFF_avg,17)
+pdff_wholeliver_avg = tmp[:-9]
+# old data PDFF is in thousands to PDFF %
+pdff_wholeliver_avg[0]=pdff_wholeliver_gmm[0]/10
+pdff_wholeliver_avg[1]=pdff_wholeliver_gmm[1]/10
 
 
 #%%
 # scatter plot and correlation coefficient between volume measurements 
 x = pdff_8avg
-y = pdff_wholeliver_pred
+y1 = pdff_wholeliver_gmm
+pearR = np.corrcoef(x,y1)[1,0]
+print(pearR.shape)
+A = np.vstack([x,np.ones(x.shape[0])]).T
+m,c = np.linalg.lstsq(A,y1)[0]
+plt.scatter(x,y1, color='red')
+plt.plot(x,x*m+c,color='blue',label='r=%3.3f'%(pearR))
+plt.legend(loc=2) # legend at upper left
+plt.xlabel('mean PDFF over 9 manual ROI')
+plt.ylabel('mean PDFF from automated segmentation')
+
+
+#%% Bland-altman fashion plot
+x1 = x
+x2 = y1
+mean_vol = (x1 + x2)/2
+diff_vol = (x1 - x2)#/x1*100
+md        = np.mean(diff_vol)       # Mean of the difference
+sd        = np.std(diff_vol, axis=0)    # Standard deviation of the difference
+plt.scatter(mean_vol, diff_vol)
+plt.axhline(md,           color='red', linestyle='--')
+plt.axhline(md + 1.96*sd, color='blue', linestyle='--')
+plt.axhline(md - 1.96*sd, color='blue', linestyle='--')
+plt.xlabel('mean PDFF')
+plt.ylabel('difference in PDFF (manual-automated) ')
+plt.title('Bland-Altman Plot of PDFF measurements')
+
+
+#%%
+y2 = pdff_wholeliver_avg
+pearR = np.corrcoef(x,y2)[1,0]
+print(pearR.shape)
+A = np.vstack([x,np.ones(x.shape[0])]).T
+m,c = np.linalg.lstsq(A,y2)[0]
+plt.scatter(x,y2, color='red')
+plt.plot(x,x*m+c,color='blue',label='r=%3.3f'%(pearR))
+plt.legend(loc=2) # legend at upper left
+plt.xlabel('mean PDFF over 9 manual ROI')
+plt.ylabel('mean PDFF from automated segmentation')
+
+
+#%% Bland-altman fashion plot
+x1 = x
+x2 = y2
+mean_vol = (x1 + x2)/2
+diff_vol = (x1 - x2)#/x1*100
+md        = np.mean(diff_vol)       # Mean of the difference
+sd        = np.std(diff_vol, axis=0)    # Standard deviation of the difference
+plt.scatter(mean_vol, diff_vol)
+plt.axhline(md,           color='red', linestyle='--')
+plt.axhline(md + 1.96*sd, color='blue', linestyle='--')
+plt.axhline(md - 1.96*sd, color='blue', linestyle='--')
+plt.xlabel('averaged PDFF')
+plt.ylabel('difference in PDFF (manual-automated) ')
+plt.title('Bland-Altman Plot of PDFF measurements')
+
+
+#%% compare TLFI measurements
+tmp = np.delete(liverVol_seg,17)
+lv_manual = tmp[:-9]
+tmp = np.delete(liverVol_pred,17)
+lv_auto = tmp[:-9]
+
+#%%
+x = pdff_8avg * lv_manual/33.3
+y = pdff_wholeliver_avg*lv_auto/33.3
 pearR = np.corrcoef(x,y)[1,0]
 print(pearR.shape)
 A = np.vstack([x,np.ones(x.shape[0])]).T
@@ -253,6 +251,21 @@ m,c = np.linalg.lstsq(A,y)[0]
 plt.scatter(x,y, color='red')
 plt.plot(x,x*m+c,color='blue',label='r=%3.3f'%(pearR))
 plt.legend(loc=2) # legend at upper left
-plt.xlabel('mean PDFF mea')
-plt.ylabel('Manual liver volumes (cm^3)')
+plt.xlabel('automated TLFI (%*mL)')
+plt.ylabel('manual TLFI (%*mL)')
+
+#%%
+x1 = x
+x2 = y
+mean_vol = (x1 + x2)/2
+diff_vol = (x1 - x2)#/x1*100
+md        = np.mean(diff_vol)       # Mean of the difference
+sd        = np.std(diff_vol, axis=0)    # Standard deviation of the difference
+plt.scatter(mean_vol, diff_vol)
+plt.axhline(md,           color='red', linestyle='--')
+plt.axhline(md + 1.96*sd, color='blue', linestyle='--')
+plt.axhline(md - 1.96*sd, color='blue', linestyle='--')
+plt.xlabel('averaged TLFI (%*mL)')
+plt.ylabel('difference in TLFI (manual-automated) ')
+plt.title('Bland-Altman Plot of TLFI calculations')
 

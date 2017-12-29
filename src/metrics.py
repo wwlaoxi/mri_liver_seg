@@ -75,7 +75,7 @@ def estimate_mean_from_gmm(pdff_values):
     # use BIC criteria to choose 1 vs. 2 component GMM
     bic = []
     lowest_bic = np.infty
-    n_components_range = 3
+    n_components_range = range(1,3)
     for n_components in n_components_range:
         gmm = mixture.GaussianMixture(n_components=n_components)
         gmm.fit(pdff_values)

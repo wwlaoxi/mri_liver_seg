@@ -51,7 +51,7 @@ list_seg = listdir_fullpath(seg_dir)
 # setup training and test data
 
 # only grab the out-of-phase echoes
-echo_list = [0]
+echo_list = [0,1,2,3,4,5]
 img_list_train = [ii for ii in range(143)] + [ii for ii in range(174,241)]
 img_list_test = [ii for ii in range(143,173)] 
 train_img_list,train_seg_list = get_subset(img_dir,seg_dir,echo_list,img_list_train)
@@ -78,7 +78,7 @@ image_datagen = ImageDataGenerator(**data_gen_args)
 mask_datagen = ImageDataGenerator(**data_gen_args)
 
 images,masks, tmp = batch_read(train_list,10,0)
-images,masks, tmp = batch_read_multiecho(train_list,10,0,[0,1,2,3,4,5])
+#images,masks, tmp = batch_read_multiecho(train_list,10,0,[0,1,2,3,4,5])
 # Provide the same seed and keyword arguments to the fit and flow methods
 #%%
 seed = 1
@@ -88,12 +88,12 @@ mask_datagen.fit(masks, augment=True, seed=seed)
 seed = np.random.randint(0,10000)
 # these are the actual image and mask generators
 img_gen = image_datagen.flow(images[:,:,:,0:1],seed=seed)
-img_gen2 = image_datagen.flow(images[:,:,:,1:2],seed=seed)
+#img_gen2 = image_datagen.flow(images[:,:,:,1:2],seed=seed)
 mask_gen = mask_datagen.flow(masks[:,:,:,0:1],seed=seed)
 
-tmp1 = next(img_gen)
-tmp2 = next(mask_gen) 
-tmp3 = next(img_gen2)
+#tmp1 = next(img_gen)
+#tmp2 = next(mask_gen) 
+#tmp3 = next(img_gen2)
 
 #%% 
 def batch_generator(data_list,
@@ -116,7 +116,8 @@ def batch_generator(data_list,
     while 1:
         #print("using data slice #" + str(ii) + "\n")
         # load batches of img and segmentation        
-        img_train, mask_train, ii = batch_read_multiecho(data_list,batch_size,ii,[0,1,2,3,4,5])
+        #img_train, mask_train, ii = batch_read_multiecho(data_list,batch_size,ii,[0,1,2,3,4,5])
+        img_train, mask_train, ii = batch_read(data_list,batch_size,ii)
        # reset if we reach the end of all files
         if ii%Nslices ==0:
             #print("reseting ii to 0\n")
@@ -129,8 +130,10 @@ def batch_generator(data_list,
         # perform histogram matching if needed
         for img_ii in range(batch_size):
             hist_match_ii = np.random.randint(0,batch_size-1)
-            for echo_ii in range(num_echo):
-                img_train[img_ii,:,:,echo_ii] = hist_match(img_train[img_ii,:,:,echo_ii],img_train[hist_match_ii,:,:,echo_ii])
+            # we allow probability 1/2 time to perform histogram equilization and other 1/2 times will be original images
+            if np.random.uniform() <0.2:
+                for echo_ii in range(num_echo):
+                    img_train[img_ii,:,:,echo_ii] = hist_match(img_train[img_ii,:,:,echo_ii],img_train[hist_match_ii,:,:,echo_ii])
 
         if image_generator:
             seed = np.random.randint(0,10000)
@@ -156,7 +159,7 @@ train_generator = batch_generator(train_list,20,image_datagen,mask_datagen)
 test_generator = batch_generator(test_list,20)
 for x_test, y_test in train_generator:
 #    print(x_test.shape)
-    imshow(x_test[5,:,:,0],x_test[5,:,:,3],y_test[5,:,:,0])
+    imshow(x_test[5,:,:,0],y_test[5,:,:,0],y_test[5,:,:,0])
     ct = ct+1
     if ct>10:
         break
@@ -175,7 +178,7 @@ print("using "+ str(n_train)+" for training and using "+ str(n_test)+" for testi
 #%%
 nx = 224
 ny = 224
-n_channels = 6
+n_channels = 1
 
 # make the training and test data generator
 train_generator = batch_generator(train_list,batch_size,image_datagen,mask_datagen)
@@ -203,7 +206,7 @@ model.compile(optimizer=Adam(lr=1e-5), loss=jacc_dist, metrics=[dice_coef])
 
 
 #%% start training
-num_epochs=30
+num_epochs=20
 n_per_epoch = np.round(n_train/batch_size)
 n_test_steps = np.round(n_test/batch_size)
 hist1 = model.fit_generator(train_generator,steps_per_epoch=n_per_epoch,epochs=num_epochs,
@@ -212,7 +215,7 @@ hist1 = model.fit_generator(train_generator,steps_per_epoch=n_per_epoch,epochs=n
                                verbose=1)
 
 #%%
-model_fn ='liverseg_mri6E_nodropout_drsn_augment_histeq_12102017'
+model_fn ='liverseg_mri6E_nodropout_drsn_augment_histeq_individualEcho_12227017'
 model.save(model_fn)
 
 #%% save the hist object that store the optimization
